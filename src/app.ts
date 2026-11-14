@@ -3,7 +3,11 @@ import cors from 'cors';
 import { RowDataPacket } from 'mysql2/promise';
 import './config/env';
 import { pool } from './config/db';
-import { syncOpinetStations, startOpinetSyncScheduler } from './batch/opinet.sync';
+import {
+  syncOpinetStations,
+  startOpinetSyncScheduler,
+  SyncChunkOption,
+} from './batch/opinet.sync';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -23,13 +27,37 @@ app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'OK' });
 });
 
+function parseChunkQuery(rawChunk: unknown): SyncChunkOption | null {
+  if (rawChunk === undefined || rawChunk === null || rawChunk === '') {
+    return 'all';
+  }
+  const str = String(rawChunk).trim().toLowerCase();
+  if (str === 'all') {
+    return 'all';
+  }
+  if (str === '1' || str === '2' || str === '3' || str === '4') {
+    return Number(str) as 1 | 2 | 3 | 4;
+  }
+  return null;
+}
+
 // 수동 오피넷 동기화 엔드포인트 (브라우저 GET 및 Postman POST 모두 지원)
-const handleManualOpinetSync = async (_req: Request, res: Response): Promise<void> => {
+const handleManualOpinetSync = async (req: Request, res: Response): Promise<void> => {
+  const chunkOption = parseChunkQuery(req.query.chunk);
+  if (!chunkOption) {
+    res.status(400).json({
+      success: false,
+      message: '유효하지 않은 chunk 파라미터입니다. (1, 2, 3, 4, all 중 하나를 사용하세요)',
+    });
+    return;
+  }
+
   try {
-    const result = await syncOpinetStations();
+    const result = await syncOpinetStations({ chunk: chunkOption });
     res.status(200).json({
       success: true,
       message: '오피넷 주유소 데이터 수집 및 갱신이 완료되었습니다.',
+      updatedCount: result.upsertedCount,
       data: result,
     });
   } catch (error) {
@@ -49,7 +77,7 @@ const handleManualOpinetSync = async (_req: Request, res: Response): Promise<voi
 app.post('/api/v1/admin/sync-opinet', handleManualOpinetSync);
 app.get('/api/v1/admin/sync-opinet', handleManualOpinetSync);
 
-// 관리자 키 검증 기반 원격 수동 갱신 엔드포인트 (GET /api/v1/admin/sync?key=smartoil)
+// 관리자 키 검증 기반 원격 수동 갱신 엔드포인트 (GET /api/v1/admin/sync?key=smartoil&chunk=1~4|all)
 app.get('/api/v1/admin/sync', async (req: Request, res: Response): Promise<void> => {
   const adminKey = process.env.ADMIN_KEY || 'smartoil';
   const providedKey = typeof req.query.key === 'string' ? req.query.key : '';
@@ -62,11 +90,21 @@ app.get('/api/v1/admin/sync', async (req: Request, res: Response): Promise<void>
     return;
   }
 
+  const chunkOption = parseChunkQuery(req.query.chunk);
+  if (!chunkOption) {
+    res.status(400).json({
+      success: false,
+      message: '유효하지 않은 chunk 파라미터입니다. (1, 2, 3, 4, all 중 하나를 사용하세요)',
+    });
+    return;
+  }
+
   try {
-    const result = await syncOpinetStations();
+    const result = await syncOpinetStations({ chunk: chunkOption });
     res.status(200).json({
       success: true,
       message: '오피넷 수동 갱신 완료',
+      chunk: result.chunk,
       updatedCount: result.upsertedCount,
     });
   } catch (error) {
@@ -93,7 +131,7 @@ async function checkAndRunInitialOpinetSync(): Promise<void> {
       console.log(
         '[Smart Oil Server] gas_station 데이터가 10개 미만이므로 백그라운드에서 오피넷 초기 동기화를 실행합니다...'
       );
-      syncOpinetStations().catch((err) => {
+      syncOpinetStations({ chunk: 1 }).catch((err) => {
         console.error('[Smart Oil Server] 백그라운드 초기 오피넷 동기화 실패:', err);
       });
     }
