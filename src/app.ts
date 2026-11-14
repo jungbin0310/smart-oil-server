@@ -49,6 +49,37 @@ const handleManualOpinetSync = async (_req: Request, res: Response): Promise<voi
 app.post('/api/v1/admin/sync-opinet', handleManualOpinetSync);
 app.get('/api/v1/admin/sync-opinet', handleManualOpinetSync);
 
+// 관리자 키 검증 기반 원격 수동 갱신 엔드포인트 (GET /api/v1/admin/sync?key=smartoil)
+app.get('/api/v1/admin/sync', async (req: Request, res: Response): Promise<void> => {
+  const adminKey = process.env.ADMIN_KEY || 'smartoil';
+  const providedKey = typeof req.query.key === 'string' ? req.query.key : '';
+
+  if (!providedKey || providedKey !== adminKey) {
+    res.status(403).json({
+      success: false,
+      message: '권한이 없습니다. 유효한 key 파라미터를 입력해 주세요.',
+    });
+    return;
+  }
+
+  try {
+    const result = await syncOpinetStations();
+    res.status(200).json({
+      success: true,
+      message: '오피넷 수동 갱신 완료',
+      updatedCount: result.upsertedCount,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : '오피넷 주유소 데이터 동기화 중 오류가 발생했습니다.';
+    console.error('[Admin Sync API] 오피넷 수동 동기화 오류:', error);
+    res.status(500).json({
+      success: false,
+      message,
+    });
+  }
+});
+
 /**
  * 서버 시작 시 gas_station 테이블 데이터 개수가 10개 미만이면 백그라운드에서 1회 자동 동기화 실행
  */
