@@ -6,7 +6,7 @@ import { pool } from './config/db';
 import {
   syncOpinetStations,
   startOpinetSyncScheduler,
-  SyncChunkOption,
+  FuelCodeOption,
 } from './batch/opinet.sync';
 
 const app = express();
@@ -27,36 +27,42 @@ app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'OK' });
 });
 
-function parseChunkQuery(rawChunk: unknown): SyncChunkOption | null {
-  if (rawChunk === undefined || rawChunk === null || rawChunk === '') {
+function parseFuelQuery(rawFuel: unknown): FuelCodeOption | null {
+  if (rawFuel === undefined || rawFuel === null || rawFuel === '') {
     return 'all';
   }
-  const str = String(rawChunk).trim().toLowerCase();
-  if (str === 'all') {
+  const str = String(rawFuel).trim().toUpperCase();
+  if (str === 'ALL') {
     return 'all';
   }
-  if (str === '1' || str === '2' || str === '3' || str === '4') {
-    return Number(str) as 1 | 2 | 3 | 4;
+  if (str === 'B027' || str === 'D047' || str === 'K015') {
+    return str;
   }
   return null;
 }
 
 // 수동 오피넷 동기화 엔드포인트 (브라우저 GET 및 Postman POST 모두 지원)
 const handleManualOpinetSync = async (req: Request, res: Response): Promise<void> => {
-  const chunkOption = parseChunkQuery(req.query.chunk);
-  if (!chunkOption) {
+  const fuelOption = parseFuelQuery(req.query.fuel);
+  if (!fuelOption) {
     res.status(400).json({
       success: false,
-      message: '유효하지 않은 chunk 파라미터입니다. (1, 2, 3, 4, all 중 하나를 사용하세요)',
+      message: '유효하지 않은 fuel 파라미터입니다. (all, B027, D047, K015 중 하나를 사용하세요)',
     });
     return;
   }
 
   try {
-    const result = await syncOpinetStations({ chunk: chunkOption });
+    const result = await syncOpinetStations({ fuel: fuelOption });
     res.status(200).json({
       success: true,
-      message: '오피넷 주유소 데이터 수집 및 갱신이 완료되었습니다.',
+      message: '오피넷 수도권 주유소 데이터 수집 및 갱신이 완료되었습니다.',
+      fuel: result.fuel,
+      syncedFuels: result.syncedFuels,
+      skippedFuels: result.skippedFuels,
+      hubCount: result.hubCount,
+      totalApiCalls: result.totalApiCalls,
+      totalMergedStations: result.totalMergedStations,
       updatedCount: result.upsertedCount,
       data: result,
     });
@@ -77,7 +83,7 @@ const handleManualOpinetSync = async (req: Request, res: Response): Promise<void
 app.post('/api/v1/admin/sync-opinet', handleManualOpinetSync);
 app.get('/api/v1/admin/sync-opinet', handleManualOpinetSync);
 
-// 관리자 키 검증 기반 원격 수동 갱신 엔드포인트 (GET /api/v1/admin/sync?key=smartoil&chunk=1~4|all)
+// 관리자 키 검증 기반 원격 수동 갱신 엔드포인트 (GET /api/v1/admin/sync?key=smartoil&fuel=all|B027|D047|K015)
 app.get('/api/v1/admin/sync', async (req: Request, res: Response): Promise<void> => {
   const adminKey = process.env.ADMIN_KEY || 'smartoil';
   const providedKey = typeof req.query.key === 'string' ? req.query.key : '';
@@ -90,21 +96,26 @@ app.get('/api/v1/admin/sync', async (req: Request, res: Response): Promise<void>
     return;
   }
 
-  const chunkOption = parseChunkQuery(req.query.chunk);
-  if (!chunkOption) {
+  const fuelOption = parseFuelQuery(req.query.fuel);
+  if (!fuelOption) {
     res.status(400).json({
       success: false,
-      message: '유효하지 않은 chunk 파라미터입니다. (1, 2, 3, 4, all 중 하나를 사용하세요)',
+      message: '유효하지 않은 fuel 파라미터입니다. (all, B027, D047, K015 중 하나를 사용하세요)',
     });
     return;
   }
 
   try {
-    const result = await syncOpinetStations({ chunk: chunkOption });
+    const result = await syncOpinetStations({ fuel: fuelOption });
     res.status(200).json({
       success: true,
-      message: '오피넷 수동 갱신 완료',
-      chunk: result.chunk,
+      message: '오피넷 수도권 주유소 수동 갱신 완료',
+      fuel: result.fuel,
+      syncedFuels: result.syncedFuels,
+      skippedFuels: result.skippedFuels,
+      hubCount: result.hubCount,
+      totalApiCalls: result.totalApiCalls,
+      totalMergedStations: result.totalMergedStations,
       updatedCount: result.upsertedCount,
     });
   } catch (error) {
@@ -129,9 +140,9 @@ async function checkAndRunInitialOpinetSync(): Promise<void> {
 
     if (count < 10) {
       console.log(
-        '[Smart Oil Server] gas_station 데이터가 10개 미만이므로 백그라운드에서 오피넷 초기 동기화를 실행합니다...'
+        '[Smart Oil Server] gas_station 데이터가 10개 미만이므로 백그라운드에서 오피넷 수도권 초기 동기화를 실행합니다...'
       );
-      syncOpinetStations({ chunk: 1 }).catch((err) => {
+      syncOpinetStations({ fuel: 'all' }).catch((err) => {
         console.error('[Smart Oil Server] 백그라운드 초기 오피넷 동기화 실패:', err);
       });
     }

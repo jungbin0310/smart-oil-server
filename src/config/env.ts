@@ -12,5 +12,7 @@ export const env = {
   DB_PASSWORD: process.env.DB_PASSWORD || '',
   DB_NAME: process.env.DB_NAME || 'smart_oil',
   OPINET_API_KEY: process.env.OPINET_API_KEY || '',
+  OPINET_API_KEY_2: process.env.OPINET_API_KEY_2 || '',
+  OPINET_API_KEY_3: process.env.OPINET_API_KEY_3 || '',
   ADMIN_KEY: process.env.ADMIN_KEY || 'smartoil',
 };
