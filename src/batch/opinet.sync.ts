@@ -441,7 +441,6 @@ export interface MergedStationData {
   katecX: number;
   katecY: number;
   gasolinePrice: number;
-  premiumGasolinePrice: number;
   dieselPrice: number;
   lpgPrice: number;
 }
@@ -533,7 +532,7 @@ async function fetchAroundAllByHubAndProd(
 
 /**
  * gas_station 테이블에 병합된 주유소 데이터를 Upsert(INSERT ... ON DUPLICATE KEY UPDATE)
- * - 컬럼: station_id, name, brand, road_type, gasoline_price, premium_gasoline_price, diesel_price, lpg_price, lat, lng, location
+ * - 컬럼: station_id, name, brand, road_type, gasoline_price, diesel_price, lpg_price, lat, lng, location
  * - 가격 업데이트 시 기존에 저장된 다른 유종 가격이 0으로 덮어써지지 않도록 IF(VALUES(col) > 0, VALUES(col), col) 사용
  * - location 컬럼(SRID 4326)에는 ST_GeomFromText('POINT(위도 경도)', 4326) 순서로 적재
  */
@@ -545,13 +544,12 @@ async function upsertStationsToGasStationTable(stations: MergedStationData[]): P
   const BATCH_SIZE = 100;
   let upsertedCount = 0;
 
-  const singleRowPlaceholder = '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ST_GeomFromText(?, 4326))';
+  const singleRowPlaceholder = '(?, ?, ?, ?, ?, ?, ?, ?, ?, ST_GeomFromText(?, 4326))';
   const updateClause = `
     \`name\` = VALUES(\`name\`),
     \`brand\` = VALUES(\`brand\`),
     \`road_type\` = VALUES(\`road_type\`),
     \`gasoline_price\` = IF(VALUES(\`gasoline_price\`) > 0, VALUES(\`gasoline_price\`), \`gasoline_price\`),
-    \`premium_gasoline_price\` = IF(VALUES(\`premium_gasoline_price\`) > 0, VALUES(\`premium_gasoline_price\`), \`premium_gasoline_price\`),
     \`diesel_price\` = IF(VALUES(\`diesel_price\`) > 0, VALUES(\`diesel_price\`), \`diesel_price\`),
     \`lpg_price\` = IF(VALUES(\`lpg_price\`) > 0, VALUES(\`lpg_price\`), \`lpg_price\`),
     \`lat\` = VALUES(\`lat\`),
@@ -570,7 +568,6 @@ async function upsertStationsToGasStationTable(stations: MergedStationData[]): P
         \`brand\`,
         \`road_type\`,
         \`gasoline_price\`,
-        \`premium_gasoline_price\`,
         \`diesel_price\`,
         \`lpg_price\`,
         \`lat\`,
@@ -589,7 +586,6 @@ async function upsertStationsToGasStationTable(stations: MergedStationData[]): P
         s.brand,
         s.roadType,
         s.gasolinePrice,
-        s.premiumGasolinePrice,
         s.dieselPrice,
         s.lpgPrice,
         s.lat,
@@ -724,7 +720,6 @@ export async function syncOpinetStations(options?: {
                 katecX,
                 katecY,
                 gasolinePrice: 0,
-                premiumGasolinePrice: 0,
                 dieselPrice: 0,
                 lpgPrice: 0,
               };

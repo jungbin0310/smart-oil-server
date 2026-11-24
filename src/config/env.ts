@@ -14,5 +14,7 @@ export const env = {
   OPINET_API_KEY: process.env.OPINET_API_KEY || '',
   OPINET_API_KEY_2: process.env.OPINET_API_KEY_2 || '',
   OPINET_API_KEY_3: process.env.OPINET_API_KEY_3 || '',
+  KAKAO_REST_API_KEY: process.env.KAKAO_REST_API_KEY || '',
+  JWT_SECRET: process.env.JWT_SECRET || 'smartoil-dev-jwt-secret-key',
   ADMIN_KEY: process.env.ADMIN_KEY || 'smartoil',
 };

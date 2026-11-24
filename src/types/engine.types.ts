@@ -6,6 +6,7 @@ export interface CandidateStationInput {
   stationId: string;
   name: string;
   brand: string;
+  roadType?: RoadType;
   lat: number;
   lng: number;
   unitPrice: number;
@@ -38,19 +39,18 @@ export interface RankedStationResult {
   name: string;
   brand: string;
   brandName: string;
+  roadType: RoadType;
   location: { lat: number; lng: number };
   unitPrice: number;
   expectedFuelLiter: number;
+  netSecuredLiter: number;
   detourDistanceMeter: number;
   detourDurationSec: number;
+  appliedCardName: string | null;
   costBreakdown: {
     baseFuelCost: number;
     detourExtraCost: number;
     cardDiscountAmount: number;
     finalTotalCost: number;
-  };
-  comparison: {
-    savedCostVsNearest: number;
-    popupSummaryText: string;
   };
 }

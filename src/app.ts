@@ -8,6 +8,13 @@ import {
   startOpinetSyncScheduler,
   FuelCodeOption,
 } from './batch/opinet.sync';
+import { requireAuth, optionalAuth } from './middlewares/auth.middleware';
+import { errorMiddleware } from './middlewares/error.middleware';
+import { loginWithKakao } from './controllers/auth.controller';
+import { getMasterCards } from './controllers/master.controller';
+import { getUserProfile, updateUserProfile } from './controllers/user.controller';
+import { createFuelRecord } from './controllers/record.controller';
+import { recommendStations } from './controllers/station.controller';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -26,6 +33,16 @@ app.get('/', (_req: Request, res: Response) => {
 app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'OK' });
 });
+
+// ============================================================================
+// Smart Oil 핵심 서비스 API 라우트
+// ============================================================================
+app.post('/api/v1/auth/kakao', loginWithKakao);
+app.get('/api/v1/master/cards', getMasterCards);
+app.get('/api/v1/users/profile', requireAuth, getUserProfile);
+app.put('/api/v1/users/profile', requireAuth, updateUserProfile);
+app.post('/api/v1/records', requireAuth, createFuelRecord);
+app.post('/api/v1/stations/recommend', optionalAuth, recommendStations);
 
 function parseFuelQuery(rawFuel: unknown): FuelCodeOption | null {
   if (rawFuel === undefined || rawFuel === null || rawFuel === '') {
@@ -128,6 +145,9 @@ app.get('/api/v1/admin/sync', async (req: Request, res: Response): Promise<void>
     });
   }
 });
+
+// 전역 에러 핸들링 미들웨어
+app.use(errorMiddleware);
 
 /**
  * 서버 시작 시 gas_station 테이블 데이터 개수가 10개 미만이면 백그라운드에서 1회 자동 동기화 실행
