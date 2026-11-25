@@ -778,7 +778,7 @@ export async function syncOpinetStations(options?: {
 let isCronScheduled = false;
 
 /**
- * 매일 오전 09:10 (Asia/Seoul 기준) 하루 1회 수도권 전역(280개 거점) 3대 유종 자동 수집 스케줄러 등록
+ * 매일 낮 12:10 (Asia/Seoul 기준) 하루 1회 수도권 전역(280개 거점) 3대 유종 자동 수집 스케줄러 등록
  */
 export function startOpinetSyncScheduler(): void {
   if (isCronScheduled) {
@@ -786,10 +786,10 @@ export function startOpinetSyncScheduler(): void {
   }
 
   cron.schedule(
-    '10 9 * * *',
+    '10 12 * * *',
     async () => {
       console.log(
-        '[Opinet Cron] 매일 09:10 정기 오피넷 수도권 전역(280개 거점, 3대 유종) 주유소 데이터 동기화 실행 (Asia/Seoul)...'
+        '[Opinet Cron] 매일 12:10 정기 오피넷 수도권 전역(280개 거점, 3대 유종) 주유소 데이터 동기화 실행 (Asia/Seoul)...'
       );
       try {
         await syncOpinetStations({ fuel: 'all' });
@@ -804,6 +804,6 @@ export function startOpinetSyncScheduler(): void {
 
   isCronScheduled = true;
   console.log(
-    '[Opinet Cron] 스케줄러 등록 완료 (10 9 * * * / Asia/Seoul, 매일 오전 09:10 수도권 280개 거점 하루 1회 실행)'
+    '[Opinet Cron] 스케줄러 등록 완료 (10 12 * * * / Asia/Seoul, 매일 낮 12:10 수도권 280개 거점 하루 1회 실행)'
   );
 }
