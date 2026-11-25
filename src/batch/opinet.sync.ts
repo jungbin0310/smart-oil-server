@@ -426,8 +426,6 @@ interface OpinetAroundOilItem {
   DISTANCE?: number | string;
   GIS_X_COOR: number | string;
   GIS_Y_COOR: number | string;
-  NEW_ADR?: string;
-  VAN_ADR?: string;
 }
 
 export interface MergedStationData {
@@ -435,7 +433,6 @@ export interface MergedStationData {
   name: string;
   brand: string;
   roadType: 'HIGHWAY' | 'CITY';
-  address: string | null;
   lat: number;
   lng: number;
   katecX: number;
@@ -532,7 +529,7 @@ async function fetchAroundAllByHubAndProd(
 
 /**
  * gas_station 테이블에 병합된 주유소 데이터를 Upsert(INSERT ... ON DUPLICATE KEY UPDATE)
- * - 컬럼: station_id, name, brand, road_type, gasoline_price, diesel_price, lpg_price, lat, lng, location
+ * - 컬럼: station_id, name, brand, road_type, gasoline_price, diesel_price, lpg_price, lat, lng, location, updated_at
  * - 가격 업데이트 시 기존에 저장된 다른 유종 가격이 0으로 덮어써지지 않도록 IF(VALUES(col) > 0, VALUES(col), col) 사용
  * - location 컬럼(SRID 4326)에는 ST_GeomFromText('POINT(위도 경도)', 4326) 순서로 적재
  */
@@ -544,7 +541,7 @@ async function upsertStationsToGasStationTable(stations: MergedStationData[]): P
   const BATCH_SIZE = 100;
   let upsertedCount = 0;
 
-  const singleRowPlaceholder = '(?, ?, ?, ?, ?, ?, ?, ?, ?, ST_GeomFromText(?, 4326))';
+  const singleRowPlaceholder = '(?, ?, ?, ?, ?, ?, ?, ?, ?, ST_GeomFromText(?, 4326), NOW())';
   const updateClause = `
     \`name\` = VALUES(\`name\`),
     \`brand\` = VALUES(\`brand\`),
@@ -554,7 +551,8 @@ async function upsertStationsToGasStationTable(stations: MergedStationData[]): P
     \`lpg_price\` = IF(VALUES(\`lpg_price\`) > 0, VALUES(\`lpg_price\`), \`lpg_price\`),
     \`lat\` = VALUES(\`lat\`),
     \`lng\` = VALUES(\`lng\`),
-    \`location\` = VALUES(\`location\`)
+    \`location\` = VALUES(\`location\`),
+    \`updated_at\` = NOW()
   `;
 
   for (let i = 0; i < stations.length; i += BATCH_SIZE) {
@@ -572,7 +570,8 @@ async function upsertStationsToGasStationTable(stations: MergedStationData[]): P
         \`lpg_price\`,
         \`lat\`,
         \`lng\`,
-        \`location\`
+        \`location\`,
+        \`updated_at\`
       )
       VALUES ${valuesSql}
       ON DUPLICATE KEY UPDATE ${updateClause}
@@ -714,7 +713,6 @@ export async function syncOpinetStations(options?: {
                 name,
                 brand,
                 roadType: resolveRoadType(brand, name),
-                address: item.NEW_ADR || item.VAN_ADR || null,
                 lat,
                 lng,
                 katecX,
